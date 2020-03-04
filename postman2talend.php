@@ -55,6 +55,7 @@ $entityTemplate = '{
         },
         "id": "eb704a00-496f-496a-9285-941ce78e13d6",
         "name": "template",
+        "description": "",
         "headers": []
     }
 }';
@@ -76,6 +77,7 @@ foreach ($postmanJson->requests as $pmItem) {
     $entity = json_decode($entityTemplate);
     $entity->entity->id = $pmItem->id;
     $entity->entity->name = $pmItem->name;
+    $entity->entity->description = $pmItem->description;
     $entity->entity->method->name = $pmItem->method;
 
     // url parse
@@ -85,34 +87,51 @@ foreach ($postmanJson->requests as $pmItem) {
     $entity->entity->uri->path = $url['path'];
 
     // url params
-    if (!empty($url['query'])) {
-        $urlParams = explode('&', $url['query']);
+    $rawParameters2obj = function ($str) use ($itemTemplate)
+    {
+        $urlParams = explode('&', $str);
+        $items = [];
         foreach ($urlParams as $urlParam) {
             $item = json_decode($itemTemplate);
             $urlParam = explode('=', $urlParam);
             $item->name = $urlParam[0];
             $item->value = $urlParam[1];
+            $items[] = $item;
+        }
+        return $items;
+    };
+    if (!empty($url['query'])) {
+        $entity->entity->uri->query->items = array_merge($entity->entity->uri->query->items, $rawParameters2obj($url['query']));
+    }
+    if ($pmItem->dataMode == 'raw') {
+        $entity->entity->uri->query->items = array_merge($entity->entity->uri->query->items, $rawParameters2obj($pmItem->data));
+    } else {
+        foreach ($pmItem->data as $param) {
+            $item = json_decode($itemTemplate);
+            $item->name = $param->key;
+            $item->value = $param->value;
             $entity->entity->uri->query->items[] = $item;
         }
     }
-    foreach ($pmItem->data as $param) {
-        $item = json_decode($itemTemplate);
-        $item->name = $param->key;
-        $item->value = $param->value;
-        $entity->entity->uri->query->items[] = $item;
-    }
 
     // headers
-    if (!empty($pmItem->headers))
+    $rawHeaders2obj = function ($str) use ($itemTemplate)
     {
-        $pmHeaders = explode("\n", trim($pmItem->headers));
+        $items = [];
+        $pmHeaders = explode("\n", trim($str));
         foreach ($pmHeaders as $pmHeader) {
             $header = json_decode($headerTemplate);
             $pmHeader = explode(': ', $pmHeader);
             $header->name = $pmHeader[0];
             $header->value = $pmHeader[1];
-            $entity->entity->headers[] = $header;
+            $items[] = $item;
         }
+        
+        return $items;
+    };
+    if (!empty($pmItem->headers))
+    {
+        $entity->entity->headers = array_merge($entity->entity->headers, $rawHeaders2obj($pmItem->headers));
     }
 
     //
